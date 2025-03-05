@@ -1,8 +1,9 @@
 import requests
 import re
 import pandas as pd
-import pathlib
-import sqlalchemy
+from pathlib import Path
+from config import DB_PATH
+from sqlalchemy import create_engine
 
 # ==============================================================================
 # 1. EXTRACT
@@ -106,6 +107,8 @@ df = df[df["info"] != ""]
 df["def_count"] = df.defs.apply(lambda x: len(x))
 df = df[df.def_count > 0]
 
+# TODO: reset index
+
 # ------------------------------------------------------------------------------
 # 2.1 ENTRY TABLE
 # ------------------------------------------------------------------------------
@@ -178,11 +181,11 @@ defs.columns = ["entry_id", "definition"]
 # ==============================================================================
 
 # create db folder if it does not exist
-p = pathlib.Path("db")
+p = Path("src/db")
 p.mkdir(exist_ok=True, parents=True)
 
 # sql setup
-engine = sqlalchemy.create_engine("sqlite:///db/dictionary.db")
+engine = create_engine(DB_PATH)
 
 # insert rows
 with engine.connect() as con:

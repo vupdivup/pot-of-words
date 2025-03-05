@@ -1,13 +1,16 @@
 import json
+from config import DB_PATH
 from flask import Flask, request, abort
 from sqlalchemy import create_engine, text
 
 app = Flask(__name__)
 
-engine = create_engine("sqlite:///db/dictionary.db")
+engine = create_engine(DB_PATH)
 
 @app.route("/dictionary")
 def get_keys():
+    # TODO: order object keys
+
     with engine.connect() as con:
         # return a list of definitions related to an entry
         def get_defs(entry_id):
@@ -65,6 +68,7 @@ def get_keys():
         # ======================================================================
 
         # TODO: paginate
+        # TODO: order by ID
         
         query = text("SELECT key, id FROM entry")
 
