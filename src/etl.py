@@ -4,6 +4,10 @@ import pandas as pd
 import pathlib
 import sqlalchemy
 
+# ==============================================================================
+# 1. EXTRACT
+# ==============================================================================
+
 url = "http://localhost:8080/temp/pg29765.txt"
 r = requests.get(url, stream=True)
 
@@ -23,7 +27,9 @@ patterns = {k: re.compile(v) for k, v in patterns.items()}
 
 content_flag = False
 ignore_flag = False
-entries = []
+
+# list for unprocessed entries
+raw = []
 
 for l in r.iter_lines():
     # decode line binary
@@ -48,7 +54,7 @@ for l in r.iter_lines():
         current_entry = {"key": l, "info": "", "defs": []}
         current_def_idx = -1
         
-        entries.append(current_entry)
+        raw.append(current_entry)
         
         current_section = "key"
 
@@ -86,3 +92,99 @@ for l in r.iter_lines():
         current_entry["info"] += f" {l}"
     elif current_section == "defs":
         current_entry["defs"][current_def_idx] += f" {l}"
+
+# ==============================================================================
+# 2. TRANSFORM
+# ==============================================================================
+
+df = pd.DataFrame(raw)
+
+# drop rows with empty info
+df = df[df["info"] != ""]
+
+# drop rows with 0 definitions
+df["def_count"] = df.defs.apply(lambda x: len(x))
+df = df[df.def_count > 0]
+
+# ------------------------------------------------------------------------------
+# 2.1 ENTRY TABLE
+# ------------------------------------------------------------------------------
+
+entries = df.loc[:, ["key", "info"]]
+
+# make keys lowercase
+entries.key = entries.key.str.lower()
+
+# remove leading space from info line
+entries["info"] = entries["info"].str.strip()
+
+# take first word of info line as stress pattern
+entries["pattern"] = entries["info"].str.split(" ", expand=True).iloc[:, 0]
+
+# remove trailing comma after stress pattern split
+entries.pattern = entries.pattern.str.removesuffix(",")
+
+# class abbreviations found within entry info
+classes = [
+    # NOTE: v. must come after v. t. and v. i.
+    # NOTE: this list is not complete, but reasonable
+    "n.", "v. t.", "v. i.", "v.", "a.", "adv.", "prep.", "p. p.", "interj.",
+    "conj.", "imp."
+    ]
+
+def determine_class(info):
+    for c in classes:
+        # the leading space is to ensure that class is a separate word
+        if f" {c}" in info:
+            return c
+
+# set class of key to first class abbreviation that's found in info
+entries["class"] = entries["info"].apply(determine_class)
+
+# parse etimology
+entries["etimology"] = entries["info"].str.split(
+    " Etym: ", expand=True
+).iloc[:, 1]
+
+# remove brackets from etimology col
+entries.etimology = entries.etimology.str.replace(r"[\[\]]{1}", "", regex=True)
+
+# drop info column
+entries = entries.drop(columns="info")
+
+# ------------------------------------------------------------------------------
+# 2.2 DEFINITION TABLE
+# ------------------------------------------------------------------------------
+
+# separate definition table
+defs = df.loc[:, "defs"].explode()
+
+defs = defs.str.replace("Defn: ", "")
+
+# remove numbered defs with their own etimology
+defs = defs[~defs.str.contains(r"^\d+\. Etym:")]
+
+# remove single field labels, both with and without index
+defs = defs[~defs.str.contains(r"^(?:\d+\. )*\(.*\)$")]
+
+# remove definition indices
+defs = defs.str.replace(r"^\d+\. ", "", regex=True)
+
+defs = defs.reset_index()
+defs.columns = ["entry_id", "definition"]
+
+# ==============================================================================
+# 3. LOAD TO SQLITE
+# ==============================================================================
+
+# create db folder if it does not exist
+p = pathlib.Path("db")
+p.mkdir(exist_ok=True, parents=True)
+
+# sql setup
+engine = sqlalchemy.create_engine("sqlite:///db/dictionary.db")
+
+# insert rows
+with engine.connect() as con:
+    entries.to_sql("entry", con, index_label="id", if_exists="replace")
+    defs.to_sql("definition", con, index_label="id", if_exists="replace")
