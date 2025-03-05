@@ -1,11 +1,10 @@
 import json
-from config import DB_PATH
 from flask import Flask, request, abort
 from sqlalchemy import create_engine, text
 
 app = Flask(__name__)
 
-engine = create_engine(DB_PATH)
+engine = create_engine("sqlite:///db/dictionary.db")
 
 @app.route("/dictionary")
 def get_keys():

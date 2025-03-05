@@ -2,7 +2,6 @@ import requests
 import re
 import pandas as pd
 from pathlib import Path
-from config import DB_PATH
 from sqlalchemy import create_engine
 
 # ==============================================================================
@@ -185,7 +184,7 @@ p = Path("src/db")
 p.mkdir(exist_ok=True, parents=True)
 
 # sql setup
-engine = create_engine(DB_PATH)
+engine = create_engine("sqlite:///db/dictionary.db")
 
 # insert rows
 with engine.connect() as con:
