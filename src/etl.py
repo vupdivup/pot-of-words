@@ -2,7 +2,10 @@ import requests
 import re
 import pandas as pd
 from pathlib import Path
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, insert
+from sqlalchemy.schema import CreateTable
+from sqlalchemy.orm import Session
+from model import Entry, Definition
 
 # ==============================================================================
 # 1. EXTRACT
@@ -106,7 +109,8 @@ df = df[df["info"] != ""]
 df["def_count"] = df.defs.apply(lambda x: len(x))
 df = df[df.def_count > 0]
 
-# TODO: reset index
+# reset index for continuous IDs
+df = df.reset_index()
 
 # ------------------------------------------------------------------------------
 # 2.1 ENTRY TABLE
@@ -180,13 +184,22 @@ defs.columns = ["entry_id", "definition"]
 # ==============================================================================
 
 # create db folder if it does not exist
-p = Path("src/db")
+p = Path("db")
 p.mkdir(exist_ok=True, parents=True)
 
 # sql setup
 engine = create_engine("sqlite:///db/dictionary.db")
 
 # insert rows
-with engine.connect() as con:
-    entries.to_sql("entry", con, index_label="id", if_exists="replace")
-    defs.to_sql("definition", con, index_label="id", if_exists="replace")
+with Session(engine) as s:
+    s.execute(CreateTable(Entry.__table__, if_not_exists=True))
+    s.execute(CreateTable(Definition.__table__, if_not_exists=True))
+
+    # rename is needed to match the ORM map's inner property
+    entries = entries.rename(columns={"class": "class_"})
+
+    # bulk insert
+    s.execute(insert(Entry), entries.to_dict(orient="records"))
+    s.execute(insert(Definition), defs.to_dict(orient="records"))
+
+    s.commit()
