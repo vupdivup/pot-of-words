@@ -59,9 +59,9 @@ Query all dictionary entries.
 
 #### Example
 
-Get entries starting with the letter `n`:
+Get the first two entries starting with the letter `n`:
 
-> http://localhost:5000/entries?key=n
+> http://localhost:5000/entries?key=n&size=2
 
 ```json
 [
@@ -86,8 +86,8 @@ Get entries starting with the letter `n`:
       "The cock of a gunlock. Knight.",
       "The keeper, or box into which the lock is shot. Knight."
     ]
-  },
-  ...
+  }
+]
 ```
 
 ### {host-url}/entries/{id}
@@ -98,7 +98,7 @@ Get a single dictionary entry based on its `id`.
 
 Get entry with `id` of 342:
 
-> http://localhost:5000/entries/34
+> http://localhost:5000/entries/342
 
 ```json
 {
