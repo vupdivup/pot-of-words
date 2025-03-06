@@ -9,43 +9,33 @@ app.json.sort_keys = False
 engine = create_engine("sqlite:///db/dictionary.db")
 
 @app.route("/dictionary")
-def get_keys():
+def get_entries():
     with Session(engine) as sess:
-        # get URL params
-        id = request.args.get("id", type=int)
+        # provide filters for key
         key = request.args.get("key", type=str)
+        size = request.args.get("size", type=int, default=32)
+        offset = request.args.get("offset", type=int, default=0)
 
-        # ======================================================================
-        # 1. QUERY BY ENTRY ID
-        # ======================================================================
+        query = select(Entry)
 
-        # TODO: id = 0 throws error
-        # TODO: test injection
-
-        if id:
-            query = select(Entry).where(Entry.id == id)
-
-            entry = sess.execute(query).scalars().first()
-
-            if not entry:
-                abort(404)
-
-            return entry.to_dict()
+        if not key is None:
+            # NOTE: this is unsafe!!
+            query = query.where(Entry.key.like("{}%".format(key)))
         
-        # ======================================================================
-        # 2. QUERY BY KEY
-        # ======================================================================
+        query = query.order_by(Entry.id).limit(size).offset(offset)
 
-        if key:
-            query = select(Entry).where(Entry.key == key)
+        entries = sess.execute(query).scalars()
 
-            entry = sess.execute(query).scalars().first()
+        return [e.to_dict() for e in entries]
 
-            if not entry:
-                abort(404)
+@app.route("/dictionary/<int:id>")
+def get_entry(id):
+    with Session(engine) as sess:
+        query = select(Entry).where(Entry.id == id)
 
-            return entry.to_dict()
-        
-        query = sess.execute(select(Entry))
+        entry = sess.execute(query).scalars().first()
 
-        return 
+        if not entry:
+            abort(400)
+
+        return entry.to_dict()
