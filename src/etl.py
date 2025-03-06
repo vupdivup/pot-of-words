@@ -11,7 +11,7 @@ from model import Entry, Definition
 # 1. EXTRACT
 # ==============================================================================
 
-url = "http://localhost:8080/temp/pg29765.txt"
+url = "https://www.gutenberg.org/ebooks/29765.txt.utf-8"
 r = requests.get(url, stream=True)
 
 r.raise_for_status()
