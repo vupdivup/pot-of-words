@@ -1,4 +1,4 @@
-from flask import Flask, request, abort
+from flask import Flask, request, abort, render_template
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session
 from model import Entry
@@ -8,10 +8,28 @@ app.json.sort_keys = False
 
 engine = create_engine("sqlite:///db/dictionary.db")
 
-# TODO: add index page
+@app.route("/")
+def get_index():
+    return render_template("index.html")
+
+@app.errorhandler(404)
+def get_404(e):
+    return render_template(
+        "error.html",
+        heading="404 Not Found",
+        message="There is nothing here."
+    )
+
+@app.errorhandler(400)
+def get_400(e):
+    return render_template(
+        "error.html",
+        heading="400 Bad Request",
+        message="An invalid request was sent to the server."
+    )
 
 # dictionary query
-@app.route("/dictionary")
+@app.route("/entries")
 def get_entries():
     with Session(engine) as sess:
         # filter for searching keys
@@ -19,7 +37,7 @@ def get_entries():
 
         # max number of entries in response
         size = request.args.get("size", type=int, default=32)
-        size = 32 if size > 32 or size < 0 else size
+        size = 32 if size > 128 or size < 0 else size
 
         # query offset, useful for pagination
         offset = request.args.get("offset", type=int, default=0)
@@ -37,7 +55,7 @@ def get_entries():
         return [e.to_dict() for e in entries]
 
 # endpoint for single dictionary entry
-@app.route("/dictionary/<int:id>")
+@app.route("/entries/<int:id>")
 def get_entry(id):
     with Session(engine) as sess:
         query = select(Entry).where(Entry.id == id)
